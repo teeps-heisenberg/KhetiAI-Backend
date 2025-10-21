@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     
     # OpenAI Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    OPENAI_MODEL: str = "gpt-4o-mini"  # Fast, affordable, and capable model
     
     # Audio Configuration
     AUDIO_OUTPUT_DIR: str = "audio_output"
