@@ -32,7 +32,10 @@ class Settings(BaseSettings):
     ALLOWED_HOSTS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173", 
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "https://*.vercel.app",  # Allow all Vercel deployments
+        "https://khetiai-frontend.vercel.app",  # Your frontend domain
+        "https://khetiai-backend.vercel.app"   # Your backend domain
     ]
     
     # OpenAI Configuration
