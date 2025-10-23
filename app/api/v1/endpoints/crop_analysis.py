@@ -2,13 +2,18 @@
 Crop analysis endpoints for image processing and AI analysis
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 import uuid
+import time
+
+from app.services.image_processing import image_processing_service
+from app.services.openai_service import OpenAIService
 
 router = APIRouter()
+openai_service = OpenAIService()
 
 # Pydantic models for request/response
 class CropAnalysisResponse(BaseModel):
@@ -33,11 +38,14 @@ class ImageUploadResponse(BaseModel):
 @router.post("/analyze", response_model=CropAnalysisResponse)
 async def analyze_crop(
     file: UploadFile = File(...),
-    language: str = "en"
+    language: str = Form("en"),
+    user_message: Optional[str] = Form(None)
 ):
     """
-    Analyze crop image directly
+    Analyze crop image using OpenCV preprocessing and OpenAI Vision API
     """
+    start_time = time.time()
+    
     try:
         # Validate file type
         allowed_types = ["image/jpeg", "image/png", "image/webp"]
@@ -56,46 +64,30 @@ async def analyze_crop(
                 detail=f"File too large. Maximum size: {max_size} bytes"
             )
         
-        # TODO: Implement actual AI analysis with OpenAI Vision API
-        # For now, return mock analysis results
+        # Step 1: Extract context using OpenCV preprocessing
+        context = image_processing_service.extract_crop_context(content)
+        context_text = image_processing_service.format_context_for_llm(context)
         
-        import random
-        import time
+        # Step 2: Preprocess image for Vision API
+        image_base64 = image_processing_service.preprocess_image_for_vision_api(content)
         
-        # Simulate processing time
-        processing_time = random.uniform(1.0, 3.0)
-        time.sleep(processing_time)
+        # Step 3: Analyze with OpenAI Vision API (including user message if provided)
+        analysis_result = await openai_service.analyze_crop_image(
+            image_base64=image_base64,
+            context_text=context_text,
+            language=language,
+            user_message=user_message
+        )
         
-        # Mock analysis results
-        health_score = random.uniform(60, 95)
-        disease_detected = random.choice([None, "Leaf Spot", "Powdery Mildew", "Rust"])
-        disease_confidence = random.uniform(0.7, 0.95) if disease_detected else None
-        growth_stage = random.choice(["Seedling", "Vegetative", "Flowering", "Fruiting", "Mature"])
+        # Calculate processing time
+        processing_time = time.time() - start_time
         
-        # Generate recommendations based on language
-        recommendations = {
-            "en": [
-                f"Your crop shows a health score of {health_score:.1f}%. ",
-                f"Current growth stage: {growth_stage}. ",
-                "Recommendations: Continue regular watering, monitor for pests, and ensure adequate sunlight.",
-                "Consider applying organic fertilizer in the next week." if health_score < 80 else "Your crop is in excellent condition!"
-            ],
-            "ur": [
-                f"آپ کی فصل کا صحت کا اسکور {health_score:.1f}% ہے۔ ",
-                f"موجودہ نمو کا مرحلہ: {growth_stage}۔ ",
-                "تجاویز: باقاعدہ پانی دیتے رہیں، کیڑوں کی نگرانی کریں، اور مناسب دھوپ یقینی بنائیں۔",
-                "اگلے ہفتے نامیاتی کھاد لگانے پر غور کریں۔" if health_score < 80 else "آپ کی فصل بہترین حالت میں ہے!"
-            ]
-        }
-        
-        rec_text = "".join(recommendations.get(language, recommendations["en"]))
-        
-        if disease_detected:
-            disease_rec = {
-                "en": f" Disease detected: {disease_detected} (confidence: {disease_confidence:.1%}). Consider treatment with appropriate fungicide.",
-                "ur": f" بیماری کا پتہ چلا: {disease_detected} (اعتماد: {disease_confidence:.1%})۔ مناسب فنگسائڈ سے علاج پر غور کریں۔"
-            }
-            rec_text += disease_rec.get(language, disease_rec["en"])
+        # Extract results from analysis
+        health_score = analysis_result.get("health_score")
+        growth_stage = analysis_result.get("growth_stage")
+        disease_detected = analysis_result.get("disease_detected")
+        disease_confidence = analysis_result.get("disease_confidence")
+        recommendations = analysis_result.get("recommendations", "")
         
         return CropAnalysisResponse(
             id=str(uuid.uuid4()),
@@ -104,7 +96,7 @@ async def analyze_crop(
             disease_detected=disease_detected,
             disease_confidence=disease_confidence,
             growth_stage=growth_stage,
-            recommendations=rec_text,
+            recommendations=recommendations,
             language=language,
             created_at=datetime.now(),
             processing_time=processing_time
