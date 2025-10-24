@@ -2,7 +2,7 @@
 Chat endpoints for voice and text communication
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
@@ -93,14 +93,15 @@ async def send_message(message: ChatMessage):
 @router.post("/voice", response_model=VoiceChatResponse)
 async def process_voice_input(
     audio_file: UploadFile = File(...),
-    language: str = "en",
-    conversation_id: Optional[str] = None
+    language: str = Form("en"),
+    conversation_id: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None)
 ):
     """
-    Process voice input and return both transcript and AI response with audio
+    Process voice input with optional image and return both transcript and AI response with audio
     """
     try:
-        # Validate file type
+        # Validate audio file type
         if not audio_file.content_type.startswith("audio/"):
             raise HTTPException(
                 status_code=400,
@@ -120,12 +121,42 @@ async def process_voice_input(
             )
         
         # Prepare messages for OpenAI
-        messages = [
-            {
-                "role": "user",
-                "content": transcript
-            }
-        ]
+        messages = []
+        
+        # If image is provided, analyze it first
+        if image:
+            # Validate image file type
+            if not image.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image file must be an image"
+                )
+            
+            # Read image file
+            image_bytes = await image.read()
+            
+            # Analyze image with OpenAI Vision
+            image_analysis = await openai_service.analyze_image_with_vision(
+                image_bytes=image_bytes,
+                user_message=transcript,
+                language=language
+            )
+            
+            # Use the image analysis as context
+            messages = [
+                {
+                    "role": "user",
+                    "content": f"{transcript}\n\nImage Analysis Context: {image_analysis}"
+                }
+            ]
+        else:
+            # No image, just use transcript
+            messages = [
+                {
+                    "role": "user",
+                    "content": transcript
+                }
+            ]
         
         # Get AI response
         response_text = await openai_service.get_chat_completion(
