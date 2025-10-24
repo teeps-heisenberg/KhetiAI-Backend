@@ -1,0 +1,31 @@
+# Minimal requirements for Vercel deployment
+# This removes OpenCV to stay under 250MB limit
+
+# Core FastAPI
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Configuration
+pydantic
+pydantic-settings
+python-dotenv
+
+# OpenAI integration
+openai
+
+# Audio processing (lighter alternatives)
+# pydub  # Removed - too heavy
+# gTTS   # Removed - too heavy
+
+# HTTP client
+httpx
+
+# Utilities
+aiofiles
+
+# Image processing - PIL only (no OpenCV)
+Pillow
+
+# Note: OpenCV removed due to size constraints
+# Image analysis will be basic but functional
