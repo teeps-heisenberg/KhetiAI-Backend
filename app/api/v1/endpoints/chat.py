@@ -111,8 +111,8 @@ async def process_voice_input(
         # Read audio file
         audio_bytes = await audio_file.read()
         
-        # Convert speech to text
-        transcript = await openai_service.speech_to_text(audio_bytes)
+        # Convert speech to text with language specification for better accuracy
+        transcript = await openai_service.speech_to_text(audio_bytes, language=language)
         
         if not transcript.strip():
             raise HTTPException(
